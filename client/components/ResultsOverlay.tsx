@@ -1,5 +1,5 @@
 import type { MatchState } from "../../shared/types";
-import { UNIT_COLORS } from "../../shared/game/world";
+import { unitPatternIndex } from "../../shared/game/world";
 
 interface ResultsOverlayProps {
   match: MatchState;
@@ -18,19 +18,18 @@ const REASON_LABEL: Record<string, string> = {
 
 export function ResultsOverlay({ match, accountId, busy, onRematch, onLeave }: ResultsOverlayProps) {
   const winner = match.players.find((player) => player.id === match.winnerId);
-  const winnerColor = winner ? UNIT_COLORS[winner.colorIndex % UNIT_COLORS.length] : "#39d9ff";
   const viewerWon = match.winnerId === accountId;
   const humanConnected = match.players.filter((player) => player.kind === "human" && player.connected).length;
   const canRematch = humanConnected >= 2 || (humanConnected >= 1 && match.players.some((p) => p.kind === "bot"));
 
   return (
     <div className="results-backdrop">
-      <div className={`results-card ${viewerWon ? "victory" : ""}`}>
+      <div className={`results-card ${viewerWon ? "victory" : ""}`} data-window-title="Results">
         <span className="eyebrow">{winner ? (viewerWon ? "MISSION COMPLETE" : "MATCH COMPLETE") : "MATCH COMPLETE"}</span>
         <h1>{winner ? (viewerWon ? "Victory" : `${winner.name} wins`) : "Draw"}</h1>
         {winner ? (
           <p className="results-subtitle">
-            <span className="winner-dot" style={{ background: winnerColor, boxShadow: `0 0 22px ${winnerColor}` }} />
+            <span className="winner-dot" data-unit={unitPatternIndex(winner.colorIndex)} />
             {winner.name} is the last unit standing.
           </p>
         ) : (
@@ -54,10 +53,9 @@ export function ResultsOverlay({ match, accountId, busy, onRematch, onLeave }: R
 
         <div className="result-roster">
           {match.players.map((player) => {
-            const color = UNIT_COLORS[player.colorIndex % UNIT_COLORS.length];
             return (
               <div className={`result-player ${player.id === match.winnerId ? "winner" : ""}`} key={player.id}>
-                <span className="result-swatch" style={{ background: color }} />
+                <span className="result-swatch" data-unit={unitPatternIndex(player.colorIndex)} />
                 <span>
                   <strong>{player.name}{player.id === accountId ? " (you)" : ""}</strong>
                   <small>

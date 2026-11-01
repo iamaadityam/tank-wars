@@ -1,13 +1,16 @@
 import { useEffect, useRef } from "react";
 import type { MatchState, ShotPoint, ShotResult } from "../../shared/types";
 import { WORLD } from "../../shared/types";
-import { terrainHeightAt, UNIT_COLORS } from "../../shared/game/world";
+import { terrainHeightAt, unitPatternIndex } from "../../shared/game/world";
 import type { PreviewResult } from "../types";
 
 const WIDTH = 1280;
 const HEIGHT = 640;
 const MAX_ANIMATION_MS = 3_100;
 const MIN_ANIMATION_MS = 950;
+const INK = "#000000";
+const PAPER = "#ffffff";
+const PIXEL_FONT = '"Silkscreen", "Geneva", Arial, sans-serif';
 
 interface GameCanvasProps {
   match: MatchState;
@@ -23,8 +26,70 @@ interface AnimState {
   finished: boolean;
 }
 
+interface PatternSet {
+  units: CanvasPattern[];
+  terrain: CanvasPattern;
+}
+
+const patternCache = new WeakMap<CanvasRenderingContext2D, PatternSet>();
+
 const sx = (x: number) => ((x - WORLD.minX) / (WORLD.maxX - WORLD.minX)) * WIDTH;
 const sy = (y: number) => HEIGHT - ((y - WORLD.minY) / (WORLD.maxY - WORLD.minY)) * HEIGHT;
+
+function tilePattern(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  paint: (tile: CanvasRenderingContext2D, size: number) => void,
+): CanvasPattern {
+  const tile = document.createElement("canvas");
+  tile.width = size;
+  tile.height = size;
+  const t = tile.getContext("2d");
+  if (!t) return ctx.createPattern(tile, "repeat")!;
+  t.fillStyle = PAPER;
+  t.fillRect(0, 0, size, size);
+  t.fillStyle = INK;
+  paint(t, size);
+  return ctx.createPattern(tile, "repeat")!;
+}
+
+function getPatterns(ctx: CanvasRenderingContext2D): PatternSet {
+  const cached = patternCache.get(ctx);
+  if (cached) return cached;
+
+  const units = [0, 1, 2, 3].map((index) =>
+    tilePattern(ctx, 8, (tile) => {
+      if (index === 0) {
+        tile.fillRect(0, 0, 8, 8);
+      } else if (index === 1) {
+        for (let y = 0; y < 8; y += 4) {
+          for (let x = 0; x < 8; x += 4) {
+            if ((x + y) % 8 === 0) tile.fillRect(x, y, 4, 4);
+          }
+        }
+      } else if (index === 2) {
+        for (let y = 0; y < 8; y += 2) tile.fillRect(0, y, 8, 1);
+      } else {
+        tile.strokeStyle = INK;
+        tile.lineWidth = 1;
+        for (let offset = -8; offset <= 8; offset += 4) {
+          tile.beginPath();
+          tile.moveTo(offset, 8);
+          tile.lineTo(offset + 8, 0);
+          tile.stroke();
+        }
+      }
+    }),
+  );
+
+  const terrain = tilePattern(ctx, 4, (tile) => {
+    for (let i = 0; i < 4; i++) tile.fillRect(i, i, 1, 1);
+  });
+
+  const patterns = { units, terrain };
+  patternCache.set(ctx, patterns);
+  return patterns;
+}
 
 function pathFromPoints(ctx: CanvasRenderingContext2D, points: ShotPoint[], fraction = 1): void {
   if (points.length === 0) return;
@@ -61,42 +126,38 @@ function trailTo(
 }
 
 function drawGrid(ctx: CanvasRenderingContext2D): void {
-  const bg = ctx.createLinearGradient(0, 0, 0, HEIGHT);
-  bg.addColorStop(0, "#06101b");
-  bg.addColorStop(0.65, "#081722");
-  bg.addColorStop(1, "#040b12");
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-  const glow = ctx.createRadialGradient(WIDTH * 0.55, HEIGHT * 0.4, 40, WIDTH * 0.55, HEIGHT * 0.45, 620);
-  glow.addColorStop(0, "rgba(29, 106, 129, 0.16)");
-  glow.addColorStop(1, "rgba(0, 0, 0, 0)");
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
   ctx.save();
+  ctx.fillStyle = PAPER;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.lineWidth = 1;
+  ctx.lineCap = "butt";
+
+  // Graph paper drawn with black pixels only: dotted minor rules and
+  // longer-dashed major rules keep the surface light without introducing grey.
   for (let x = Math.ceil(WORLD.minX / 5) * 5; x <= WORLD.maxX; x += 5) {
     const major = x % 10 === 0;
     ctx.beginPath();
-    ctx.strokeStyle = major ? "rgba(82, 182, 210, 0.15)" : "rgba(82, 182, 210, 0.055)";
-    ctx.lineWidth = major ? 1 : 0.7;
-    ctx.moveTo(sx(x), 0);
-    ctx.lineTo(sx(x), HEIGHT);
+    ctx.strokeStyle = INK;
+    ctx.setLineDash(major ? [3, 4] : [1, 5]);
+    ctx.moveTo(Math.round(sx(x)) + 0.5, 0);
+    ctx.lineTo(Math.round(sx(x)) + 0.5, HEIGHT);
     ctx.stroke();
   }
   for (let y = Math.ceil(WORLD.minY / 5) * 5; y <= WORLD.maxY; y += 5) {
     const major = y % 10 === 0;
     ctx.beginPath();
-    ctx.strokeStyle = major ? "rgba(82, 182, 210, 0.15)" : "rgba(82, 182, 210, 0.055)";
-    ctx.lineWidth = major ? 1 : 0.7;
-    ctx.moveTo(0, sy(y));
-    ctx.lineTo(WIDTH, sy(y));
+    ctx.strokeStyle = INK;
+    ctx.setLineDash(major ? [3, 4] : [1, 5]);
+    ctx.moveTo(0, Math.round(sy(y)) + 0.5);
+    ctx.lineTo(WIDTH, Math.round(sy(y)) + 0.5);
     ctx.stroke();
   }
+  ctx.setLineDash([]);
   ctx.restore();
 }
 
 function drawTerrain(ctx: CanvasRenderingContext2D): void {
+  const patterns = getPatterns(ctx);
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(0, HEIGHT);
@@ -105,11 +166,7 @@ function drawTerrain(ctx: CanvasRenderingContext2D): void {
   }
   ctx.lineTo(WIDTH, HEIGHT);
   ctx.closePath();
-  const fill = ctx.createLinearGradient(0, sy(12), 0, HEIGHT);
-  fill.addColorStop(0, "rgba(21, 88, 83, 0.58)");
-  fill.addColorStop(0.4, "rgba(13, 52, 58, 0.86)");
-  fill.addColorStop(1, "rgba(3, 13, 20, 0.98)");
-  ctx.fillStyle = fill;
+  ctx.fillStyle = patterns.terrain;
   ctx.fill();
 
   ctx.beginPath();
@@ -119,18 +176,17 @@ function drawTerrain(ctx: CanvasRenderingContext2D): void {
     if (x === WORLD.minX) ctx.moveTo(px, py);
     else ctx.lineTo(px, py);
   }
-  ctx.strokeStyle = "#37d3a3";
-  ctx.shadowColor = "rgba(55,211,163,.5)";
-  ctx.shadowBlur = 12;
-  ctx.lineWidth = 2.2;
+  ctx.setLineDash([]);
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 2;
   ctx.stroke();
   ctx.restore();
 
-  // Fine contour texture.
+  // MacPaint-style contour hatching under the surface.
   ctx.save();
-  ctx.globalAlpha = 0.13;
-  ctx.strokeStyle = "#7ef7ce";
+  ctx.strokeStyle = INK;
   ctx.lineWidth = 1;
+  ctx.setLineDash([2, 4]);
   for (let offset = 3; offset <= 12; offset += 3.5) {
     ctx.beginPath();
     for (let x = WORLD.minX; x <= WORLD.maxX; x += 1) {
@@ -140,55 +196,53 @@ function drawTerrain(ctx: CanvasRenderingContext2D): void {
     }
     ctx.stroke();
   }
+  ctx.setLineDash([]);
   ctx.restore();
 }
 
 function drawAxes(ctx: CanvasRenderingContext2D): void {
   ctx.save();
-  ctx.font = "600 13px 'Cascadia Code', 'SFMono-Regular', Consolas, monospace";
-  ctx.fillStyle = "rgba(139, 211, 228, 0.78)";
+  ctx.font = `10px ${PIXEL_FONT}`;
+  ctx.fillStyle = INK;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1;
+
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
   for (let x = -60; x <= 60; x += 20) {
-    const px = sx(x);
-    ctx.strokeStyle = "rgba(137, 208, 225, 0.3)";
-    ctx.lineWidth = 1;
+    const px = Math.round(sx(x)) + 0.5;
     ctx.beginPath();
     ctx.moveTo(px, HEIGHT - 27);
     ctx.lineTo(px, HEIGHT - 20);
     ctx.stroke();
-    ctx.fillText(String(x), px, HEIGHT - 16);
+    if (x !== 0) ctx.fillText(String(x), px, HEIGHT - 16);
   }
+
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
   for (let y = -10; y <= 50; y += 10) {
-    const py = sy(y);
-    ctx.strokeStyle = "rgba(137, 208, 225, 0.3)";
+    const py = Math.round(sy(y)) + 0.5;
     ctx.beginPath();
     ctx.moveTo(4, py);
     ctx.lineTo(12, py);
     ctx.stroke();
-    ctx.fillStyle = "rgba(139, 211, 228, 0.7)";
-    ctx.fillText(String(y), 18, py);
+    if (y !== 0) ctx.fillText(String(y), 18, py);
   }
 
-  // Axis reference lines sit above the terrain as a graph overlay.
-  ctx.setLineDash([6, 8]);
-  ctx.strokeStyle = "rgba(116, 201, 222, 0.34)";
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(0, sy(0));
-  ctx.lineTo(WIDTH, sy(0));
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(sx(0), 0);
-  ctx.lineTo(sx(0), HEIGHT);
-  ctx.stroke();
+  // Axes sit above the terrain and use a heavier, uninterrupted rule.
   ctx.setLineDash([]);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, Math.round(sy(0)) + 0.5);
+  ctx.lineTo(WIDTH, Math.round(sy(0)) + 0.5);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(Math.round(sx(0)) + 0.5, 0);
+  ctx.lineTo(Math.round(sx(0)) + 0.5, HEIGHT);
+  ctx.stroke();
 
-  ctx.font = "700 12px 'Cascadia Code', Consolas, monospace";
+  ctx.font = `bold 12px ${PIXEL_FONT}`;
   ctx.textAlign = "right";
-  ctx.fillStyle = "rgba(116, 201, 222, 0.6)";
   ctx.fillText("x", WIDTH - 16, sy(0) - 12);
   ctx.textAlign = "left";
   ctx.fillText("y", sx(0) + 12, 16);
@@ -197,47 +251,43 @@ function drawAxes(ctx: CanvasRenderingContext2D): void {
 
 function drawLegend(ctx: CanvasRenderingContext2D, expression: string | null, animating: boolean): void {
   ctx.save();
-  ctx.font = "600 12px 'Cascadia Code', Consolas, monospace";
+  ctx.font = `10px ${PIXEL_FONT}`;
   ctx.textBaseline = "middle";
-  ctx.fillStyle = "rgba(6, 16, 27, 0.78)";
-  ctx.strokeStyle = "rgba(87, 169, 193, 0.22)";
+  ctx.fillStyle = PAPER;
+  ctx.strokeStyle = INK;
   ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.roundRect(22, 18, 236, 58, 8);
-  ctx.fill();
-  ctx.stroke();
-  ctx.strokeStyle = "#39d9ff";
-  ctx.setLineDash([6, 5]);
+  ctx.fillRect(20.5, 16.5, 248, 58);
+  ctx.strokeRect(20.5, 16.5, 248, 58);
+
+  ctx.strokeStyle = INK;
+  ctx.setLineDash([5, 4]);
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(36, 36);
-  ctx.lineTo(70, 36);
+  ctx.moveTo(34, 36);
+  ctx.lineTo(68, 36);
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = "rgba(190, 234, 243, 0.82)";
+  ctx.fillStyle = INK;
   ctx.fillText("PREDICTED", 80, 37);
-  ctx.strokeStyle = "#ff8a3d";
-  ctx.lineWidth = 2.6;
+
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(36, 58);
-  ctx.lineTo(70, 58);
+  ctx.moveTo(34, 58);
+  ctx.lineTo(68, 58);
   ctx.stroke();
-  ctx.fillStyle = "rgba(190, 234, 243, 0.82)";
-  ctx.fillText(animating ? "FIRING…" : "LAST SHOT", 80, 59);
+  ctx.fillText(animating ? "FIRING..." : "LAST SHOT", 80, 59);
 
   if (expression) {
-    ctx.font = "600 12px 'Cascadia Code', Consolas, monospace";
     const label = `f(x) = ${expression}`;
-    const width = Math.min(480, ctx.measureText(label).width + 30);
-    ctx.fillStyle = "rgba(6, 16, 27, 0.8)";
-    ctx.strokeStyle = "rgba(255,138,61,.35)";
-    ctx.beginPath();
-    ctx.roundRect(WIDTH - width - 22, 18, width, 34, 8);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#ffae72";
+    const width = Math.min(500, Math.ceil(ctx.measureText(label).width) + 20);
+    const x = WIDTH - width - 20;
+    ctx.fillStyle = PAPER;
+    ctx.strokeStyle = INK;
+    ctx.fillRect(x + 0.5, 16.5, width, 30);
+    ctx.strokeRect(x + 0.5, 16.5, width, 30);
+    ctx.fillStyle = INK;
     ctx.textAlign = "left";
-    ctx.fillText(label, WIDTH - width - 7, 35, width - 24);
+    ctx.fillText(label, x + 10, 32, width - 18);
   }
   ctx.restore();
 }
@@ -253,87 +303,93 @@ function drawUnit(
   if (!player) return;
   const px = sx(player.x);
   const py = sy(player.y);
-  const color = UNIT_COLORS[player.colorIndex % UNIT_COLORS.length];
+  const patterns = getPatterns(ctx);
   const active = match.currentPlayerId === player.id && match.status === "active";
   const radius = WORLD.unitRadius * 10;
 
   ctx.save();
   if (active) {
-    const pulse = (Math.sin(now / 260) + 1) / 2;
     ctx.beginPath();
-    ctx.arc(px, py, radius + 8 + pulse * 6, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(255,255,255,${0.18 + pulse * 0.28})`;
-    ctx.lineWidth = 2;
+    ctx.arc(px, py, radius + 7, 0, Math.PI * 2);
+    ctx.setLineDash([3, 3]);
+    ctx.lineDashOffset = -now / 100;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.5;
     ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(px, py, radius + 12, 0, Math.PI * 2);
-    ctx.strokeStyle = `${color}55`;
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    ctx.setLineDash([]);
   }
 
-  ctx.globalAlpha = player.eliminated ? 0.38 : 1;
+  ctx.globalAlpha = player.eliminated ? 0.34 : 1;
   ctx.beginPath();
   ctx.arc(px, py, radius, 0, Math.PI * 2);
-  ctx.fillStyle = `${color}24`;
+  ctx.fillStyle = patterns.units[unitPatternIndex(player.colorIndex)];
   ctx.fill();
-  ctx.lineWidth = 2.6;
-  ctx.strokeStyle = color;
-  ctx.shadowColor = color;
-  ctx.shadowBlur = active ? 24 : 10;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 2;
   ctx.stroke();
-  ctx.shadowBlur = 0;
 
   ctx.beginPath();
   ctx.arc(px, py, radius - 6, 0, Math.PI * 2);
-  ctx.fillStyle = "#07131f";
+  ctx.fillStyle = PAPER;
   ctx.fill();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1;
+  ctx.stroke();
 
-  ctx.fillStyle = color;
+  ctx.fillStyle = INK;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = "800 18px 'Segoe UI', system-ui, sans-serif";
+  ctx.font = `bold 18px ${PIXEL_FONT}`;
   ctx.fillText(player.name.slice(0, 1).toUpperCase(), px, py + 1);
 
   if (player.eliminated) {
-    ctx.strokeStyle = "#ff5e73";
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = PAPER;
+    ctx.lineWidth = 6;
     ctx.beginPath();
-    ctx.moveTo(px - 11, py - 11);
-    ctx.lineTo(px + 11, py + 11);
-    ctx.moveTo(px + 11, py - 11);
-    ctx.lineTo(px - 11, py + 11);
+    ctx.moveTo(px - 10, py - 10);
+    ctx.lineTo(px + 10, py + 10);
+    ctx.moveTo(px + 10, py - 10);
+    ctx.lineTo(px - 10, py + 10);
+    ctx.stroke();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(px - 10, py - 10);
+    ctx.lineTo(px + 10, py + 10);
+    ctx.moveTo(px + 10, py - 10);
+    ctx.lineTo(px - 10, py + 10);
     ctx.stroke();
   }
 
   ctx.globalAlpha = 1;
   const barWidth = 66;
-  const barX = px - barWidth / 2;
-  const barY = py + radius + 9;
-  ctx.fillStyle = "rgba(2, 8, 14, 0.9)";
-  ctx.beginPath();
-  ctx.roundRect(barX, barY, barWidth, 7, 3);
-  ctx.fill();
+  const barX = Math.round(px - barWidth / 2);
+  const barY = Math.round(py + radius + 9);
+  ctx.fillStyle = PAPER;
+  ctx.fillRect(barX, barY, barWidth, 8);
   const health = Math.max(0, player.health / player.maxHealth);
   if (health > 0) {
-    ctx.fillStyle = health > 0.6 ? "#58df9d" : health > 0.3 ? "#ffd166" : "#ff5e73";
-    ctx.beginPath();
-    ctx.roundRect(barX, barY, barWidth * health, 7, 3);
-    ctx.fill();
+    ctx.fillStyle = INK;
+    ctx.fillRect(barX + 1, barY + 1, Math.max(0, (barWidth - 2) * health), 6);
   }
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(barX + 0.5, barY + 0.5, barWidth, 8);
 
-  ctx.font = "700 11px 'Cascadia Code', Consolas, monospace";
+  const tag = `${player.name.toUpperCase()}${player.id === viewerId ? " *" : ""}${
+    player.connected ? "" : " OFFLINE"
+  }`;
+  ctx.font = `10px ${PIXEL_FONT}`;
   ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillStyle = player.eliminated ? "rgba(255,255,255,.35)" : "rgba(224, 243, 247, 0.9)";
-  const tag = `${player.name.toUpperCase()}${player.id === viewerId ? " / YOU" : ""}`;
-  ctx.fillText(tag, px, barY + 12, 176);
-
-  if (!player.connected) {
-    ctx.font = "700 10px 'Cascadia Code', Consolas, monospace";
-    ctx.fillStyle = "#ff5e73";
-    ctx.fillText("OFFLINE", px, barY + 27);
-  }
+  ctx.textBaseline = "middle";
+  const labelWidth = Math.min(190, Math.ceil(ctx.measureText(tag).width) + 10);
+  const labelY = barY + 12;
+  ctx.fillStyle = PAPER;
+  ctx.fillRect(Math.round(px - labelWidth / 2) + 0.5, labelY + 0.5, labelWidth, 15);
+  ctx.strokeStyle = INK;
+  ctx.strokeRect(Math.round(px - labelWidth / 2) + 0.5, labelY + 0.5, labelWidth, 15);
+  ctx.fillStyle = INK;
+  ctx.fillText(tag, px, labelY + 8, labelWidth - 6);
   ctx.restore();
 }
 
@@ -342,83 +398,87 @@ function drawPredicted(ctx: CanvasRenderingContext2D, preview: PreviewResult | n
   ctx.save();
   ctx.beginPath();
   pathFromPoints(ctx, preview.points);
-  ctx.setLineDash([9, 8]);
-  ctx.lineDashOffset = -performance.now() / 90;
-  ctx.strokeStyle = "rgba(57, 217, 255, 0.85)";
-  ctx.lineWidth = 2.4;
-  ctx.shadowColor = "rgba(57,217,255,.7)";
-  ctx.shadowBlur = 10;
+  ctx.setLineDash([9, 7]);
+  ctx.lineDashOffset = -performance.now() / 95;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 2;
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.shadowBlur = 0;
 
   const end = preview.points[preview.points.length - 1];
   const start = preview.points[0];
-  ctx.beginPath();
-  ctx.arc(sx(start.x), sy(start.y), 5, 0, Math.PI * 2);
-  ctx.fillStyle = "#39d9ff";
-  ctx.fill();
+  const ex = Math.round(sx(end.x));
+  const ey = Math.round(sy(end.y));
+  const startX = Math.round(sx(start.x));
+  const startY = Math.round(sy(start.y));
+
+  ctx.fillStyle = PAPER;
+  ctx.fillRect(startX - 5, startY - 5, 10, 10);
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(startX - 4.5, startY - 4.5, 9, 9);
+  ctx.fillStyle = INK;
+  ctx.fillRect(startX - 2, startY - 2, 4, 4);
 
   if (preview.hitPlayerId) {
-    ctx.beginPath();
-    ctx.arc(sx(end.x), sy(end.y), 14, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(255, 94, 115, 0.9)";
+    ctx.strokeStyle = INK;
     ctx.lineWidth = 2;
-    ctx.stroke();
-  } else {
-    ctx.strokeStyle = "rgba(57,217,255,.7)";
-    ctx.lineWidth = 1.6;
+    ctx.strokeRect(ex - 12.5, ey - 12.5, 25, 25);
     ctx.beginPath();
-    ctx.moveTo(sx(end.x) - 6, sy(end.y) - 6);
-    ctx.lineTo(sx(end.x) + 6, sy(end.y) + 6);
-    ctx.moveTo(sx(end.x) + 6, sy(end.y) - 6);
-    ctx.lineTo(sx(end.x) - 6, sy(end.y) + 6);
+    ctx.moveTo(ex - 18, ey);
+    ctx.lineTo(ex + 18, ey);
+    ctx.moveTo(ex, ey - 18);
+    ctx.lineTo(ex, ey + 18);
+    ctx.stroke();
+    ctx.fillStyle = INK;
+    ctx.fillRect(ex - 3, ey - 3, 6, 6);
+  } else {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(ex - 7, ey - 7);
+    ctx.lineTo(ex + 7, ey + 7);
+    ctx.moveTo(ex + 7, ey - 7);
+    ctx.lineTo(ex - 7, ey + 7);
     ctx.stroke();
   }
   ctx.restore();
 }
 
-function drawAnimation(ctx: CanvasRenderingContext2D, anim: AnimState | null, now: number): void {
+function drawAnimation(ctx: CanvasRenderingContext2D, anim: AnimState | null): void {
   if (!anim) return;
   const { shot, progress, elapsed, duration } = anim;
   const points = shot.points;
   if (points.length < 2) return;
-  const color = shot.outcome === "hit" ? "#ff8a3d" : "#ffb15e";
 
   ctx.save();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([2, 7]);
   ctx.beginPath();
   pathFromPoints(ctx, points);
-  ctx.strokeStyle = "rgba(255, 138, 61, 0.18)";
-  ctx.lineWidth = 1.4;
-  ctx.setLineDash([2, 8]);
   ctx.stroke();
   ctx.setLineDash([]);
 
   ctx.beginPath();
   const head = trailTo(ctx, points, progress);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 3.1;
-  ctx.shadowColor = "rgba(255, 138, 61, 0.85)";
-  ctx.shadowBlur = 13;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 3;
+  ctx.lineCap = "butt";
+  ctx.lineJoin = "miter";
   ctx.stroke();
-  ctx.shadowBlur = 0;
 
   if (head) {
-    const hx = sx(head.x);
-    const hy = sy(head.y);
+    const hx = Math.round(sx(head.x));
+    const hy = Math.round(sy(head.y));
     if (progress < 1) {
-      const glow = ctx.createRadialGradient(hx, hy, 0, hx, hy, 20);
-      glow.addColorStop(0, "rgba(255,255,255,1)");
-      glow.addColorStop(0.25, "rgba(255, 174, 96, 0.95)");
-      glow.addColorStop(1, "rgba(255, 138, 61, 0)");
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(hx, hy, 20, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(hx, hy, 4.5, 0, Math.PI * 2);
-      ctx.fillStyle = "#fff4e8";
-      ctx.fill();
+      ctx.fillStyle = PAPER;
+      ctx.fillRect(hx - 6, hy - 6, 12, 12);
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(hx - 5.5, hy - 5.5, 11, 11);
+      ctx.fillStyle = INK;
+      ctx.fillRect(hx - 2, hy - 2, 4, 4);
     }
   }
 
@@ -426,24 +486,37 @@ function drawAnimation(ctx: CanvasRenderingContext2D, anim: AnimState | null, no
     const impactElapsed = elapsed - duration;
     const impactT = Math.min(1, Math.max(0, impactElapsed / 650));
     const end = points[points.length - 1];
-    const ex = sx(end.x);
-    const ey = sy(end.y);
-    const radius = 10 + impactT * 44;
+    const ex = Math.round(sx(end.x));
+    const ey = Math.round(sy(end.y));
+    const radius = 9 + impactT * 42;
+    ctx.globalAlpha = 1 - impactT;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(ex, ey, radius, 0, Math.PI * 2);
-    ctx.strokeStyle =
-      shot.outcome === "hit"
-        ? `rgba(255, 94, 115, ${1 - impactT})`
-        : `rgba(255, 177, 94, ${0.8 - impactT * 0.8})`;
-    ctx.lineWidth = 3;
     ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(ex, ey, 6 + impactT * 16, 0, Math.PI * 2);
-    ctx.fillStyle =
-      shot.outcome === "hit"
-        ? `rgba(255, 94, 115, ${0.45 * (1 - impactT)})`
-        : `rgba(255, 177, 94, ${0.35 * (1 - impactT)})`;
-    ctx.fill();
+
+    // Eight chunky segments read as a one-bit impact burst.
+    ctx.lineWidth = 2.5;
+    for (let i = 0; i < 8; i++) {
+      const angle = (i * Math.PI) / 4;
+      const inner = radius + 3;
+      const outer = radius + (shot.outcome === "hit" ? 14 : 9);
+      ctx.beginPath();
+      ctx.moveTo(ex + Math.cos(angle) * inner, ey + Math.sin(angle) * inner);
+      ctx.lineTo(ex + Math.cos(angle) * outer, ey + Math.sin(angle) * outer);
+      ctx.stroke();
+    }
+
+    if (shot.outcome === "hit") {
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(ex - 10, ey - 10);
+      ctx.lineTo(ex + 10, ey + 10);
+      ctx.moveTo(ex + 10, ey - 10);
+      ctx.lineTo(ex - 10, ey + 10);
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }
@@ -461,7 +534,7 @@ function drawScene(
   drawTerrain(ctx);
   drawAxes(ctx);
   if (!anim) drawPredicted(ctx, preview);
-  drawAnimation(ctx, anim, now);
+  drawAnimation(ctx, anim);
   for (const player of match.players) {
     drawUnit(ctx, match, player.id, viewerId, now);
   }

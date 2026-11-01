@@ -22,6 +22,31 @@ interface StoredSession {
 type ConnectionState = "connecting" | "online" | "offline";
 type ToastKind = "info" | "error" | "success";
 
+function MacMenuBar() {
+  return (
+    <div className="mac-menubar" aria-hidden="true">
+      <div className="mac-menubar-left">
+        <span className="mac-system-icon">
+          <svg viewBox="0 0 16 16" focusable="false">
+            <path d="M1.5 1.5h10l3 3v10h-13z" fill="none" stroke="currentColor" />
+            <path d="M4 2.5h6v4H4z" fill="currentColor" />
+            <path d="M3.5 9.5h9v5h-9z" fill="#fff" stroke="currentColor" />
+            <path d="M5.5 11.5h5v2h-5z" fill="currentColor" />
+          </svg>
+        </span>
+        <span>File</span>
+        <span>Edit</span>
+        <span>View</span>
+        <span>Special</span>
+      </div>
+      <div className="mac-menubar-right">
+        <span className="mac-menubar-clock">GRAPHWAR 1.0</span>
+        <span className="mac-menubar-clock">OCT 1984</span>
+      </div>
+    </div>
+  );
+}
+
 interface Toast {
   id: number;
   message: string;
@@ -271,7 +296,7 @@ export function App() {
   if (blocked) {
     content = (
       <div className="full-message">
-        <div className="full-message-card">
+        <div className="full-message-card" data-window-title="Session">
           <span className="eyebrow">SESSION MOVED</span>
           <h1>Game open in another tab</h1>
           <p>Only one live connection is allowed for a profile. You can take the session back here.</p>
@@ -335,6 +360,7 @@ export function App() {
 
   return (
     <div className="app">
+      <MacMenuBar />
       {content}
       {connection !== "online" && !blocked && (
         <div className={`connection-banner ${connection}`}>

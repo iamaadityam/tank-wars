@@ -3,7 +3,7 @@ import type { Direction, MatchState } from "../../shared/types";
 import { WORLD } from "../../shared/types";
 import { compileExpression, MathExpressionError } from "../../shared/math/expression";
 import { simulateTrajectory } from "../../shared/game/trajectory";
-import { UNIT_COLORS } from "../../shared/game/world";
+import { unitPatternIndex } from "../../shared/game/world";
 import { GameCanvas } from "./GameCanvas";
 import { MathEditor } from "./MathEditor";
 import { ResultsOverlay } from "./ResultsOverlay";
@@ -154,12 +154,12 @@ export function GameScreen({
           <span className="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 48 48">
               <path d="M5 38 Q16 5 24 25 T43 12" fill="none" stroke="currentColor" strokeWidth="3" />
-              <circle cx="43" cy="12" r="4" fill="#ff8a3d" />
+              <circle cx="43" cy="12" r="4" fill="currentColor" />
             </svg>
           </span>
           <span>
-            <strong>GRAPH</strong>WAR
-            <em>LIVE MATCH</em>
+            <span className="brand-word"><strong>GRAPH</strong>WAR</span>
+            <em>LIVE MATCH / SYSTEM 1.0</em>
           </span>
         </div>
         <div className="match-id-block">
@@ -203,14 +203,13 @@ export function GameScreen({
         <div className="stage-column">
           <div className="player-hud">
             {match.players.map((player) => {
-              const color = UNIT_COLORS[player.colorIndex % UNIT_COLORS.length];
               const active = match.currentPlayerId === player.id && match.status === "active";
               return (
                 <div
                   key={player.id}
                   className={`hud-unit ${active ? "active-current" : ""} ${player.eliminated ? "down" : ""} ${!player.connected ? "offline" : ""}`}
                 >
-                  <span className="hud-icon" style={{ borderColor: color, color }}>
+                  <span className="hud-icon" data-unit={unitPatternIndex(player.colorIndex)}>
                     {player.name.slice(0, 1).toUpperCase()}
                   </span>
                   <div className="hud-unit-body">
@@ -223,10 +222,7 @@ export function GameScreen({
                     </div>
                     <div className="mini-health">
                       <span
-                        style={{
-                          width: `${Math.max(0, (player.health / player.maxHealth) * 100)}%`,
-                          background: color,
-                        }}
+                        style={{ width: `${Math.max(0, (player.health / player.maxHealth) * 100)}%` }}
                       />
                     </div>
                   </div>
@@ -294,14 +290,7 @@ export function GameScreen({
             <div className="turn-player">
               <span
                 className="turn-avatar"
-                style={
-                  current
-                    ? {
-                        borderColor: UNIT_COLORS[current.colorIndex % UNIT_COLORS.length],
-                        color: UNIT_COLORS[current.colorIndex % UNIT_COLORS.length],
-                      }
-                    : undefined
-                }
+                data-unit={current ? unitPatternIndex(current.colorIndex) : 0}
               >
                 {current?.name.slice(0, 1).toUpperCase() ?? "?"}
               </span>

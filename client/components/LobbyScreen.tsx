@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { MatchState } from "../../shared/types";
-import { UNIT_COLORS } from "../../shared/game/world";
+import { unitPatternIndex } from "../../shared/game/world";
 
 interface LobbyScreenProps {
   match: MatchState;
@@ -54,12 +54,12 @@ export function LobbyScreen({
           <span className="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 48 48">
               <path d="M5 38 Q16 5 24 25 T43 12" fill="none" stroke="currentColor" strokeWidth="3" />
-              <circle cx="43" cy="12" r="4" fill="#ff8a3d" />
+              <circle cx="43" cy="12" r="4" fill="currentColor" />
             </svg>
           </span>
           <span>
-            <strong>GRAPH</strong>WAR
-            <em>LOBBY</em>
+            <span className="brand-word"><strong>GRAPH</strong>WAR</span>
+            <em>LOBBY / SYSTEM 1.0</em>
           </span>
         </div>
         <div className={`status-pill ${connection}`}>
@@ -69,7 +69,7 @@ export function LobbyScreen({
       </header>
 
       <section className="lobby-shell">
-        <div className="lobby-main">
+        <div className="lobby-main" data-window-title="Lobby">
           <div className="lobby-heading">
             <span className="eyebrow">{match.visibility === "private" ? "PRIVATE LOBBY" : "PUBLIC LOBBY"}</span>
             <h1>Assemble the battery</h1>
@@ -91,12 +91,11 @@ export function LobbyScreen({
 
           <div className="player-list">
             {match.players.map((player, index) => {
-              const color = UNIT_COLORS[player.colorIndex % UNIT_COLORS.length];
               const isMe = player.id === accountId;
               return (
                 <div className={`lobby-player ${!player.connected ? "is-offline" : ""}`} key={player.id}>
                   <div className="player-index">{String(index + 1).padStart(2, "0")}</div>
-                  <div className="unit-swatch" style={{ background: color, boxShadow: `0 0 24px ${color}55` }}>
+                  <div className="unit-swatch" data-unit={unitPatternIndex(player.colorIndex)}>
                     {player.name.slice(0, 1).toUpperCase()}
                   </div>
                   <div className="lobby-player-info">

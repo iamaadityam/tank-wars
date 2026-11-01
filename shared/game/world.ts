@@ -14,7 +14,15 @@ export function terrainHeightAt(x: number): number {
   );
 }
 
-export const UNIT_COLORS = ["#ff8a3d", "#39d9ff", "#8bff8f", "#ff5e93"] as const;
+/**
+ * Classic Macintosh graphics are monochrome, so units are distinguished by
+ * four 1-bit fill patterns instead of colour.
+ */
+export const UNIT_PATTERN_COUNT = 4;
+
+export function unitPatternIndex(colorIndex: number): number {
+  return ((colorIndex % UNIT_PATTERN_COUNT) + UNIT_PATTERN_COUNT) % UNIT_PATTERN_COUNT;
+}
 
 export function spawnPositions(count: number): Vec2[] {
   const xs =

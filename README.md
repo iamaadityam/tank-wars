@@ -4,7 +4,11 @@ A complete, browser-based multiplayer artillery game inspired by Graphwar. Playe
 
 The project is an original implementation with no Graphwar assets or code. It includes a React client, an authoritative Node.js/Socket.IO server, a safe function parser, deterministic simulation, SQLite persistence, public/private lobbies, bots, reconnection, tests, and a production build.
 
-![Predicted trajectory in the game canvas](docs/trajectory-preview.jpg)
+This branch presents the game as a light, one-bit classic Macintosh/System 1.0 desktop while keeping gameplay, layout behavior, protocol, and server authority unchanged.
+
+![Classic Macintosh menu](docs/classic-mac-menu.png)
+
+![Predicted trajectory in the game canvas](docs/trajectory-preview.png)
 
 ## Features
 
@@ -15,7 +19,13 @@ The project is an original implementation with no Graphwar assets or code. It in
 - **Solo practice** — instant match against a deterministic bot that only uses the same public snapshot and trajectory engine available to humans.
 - **Reconnect and persistence** — opaque hashed-token accounts, saved sessions, reconnection to active matches, SQLite match snapshots, restart recovery, and exactly-once win/loss accounting.
 - **Turn safety** — 30-second clocks, automatic harmless shots on timeout or prolonged disconnect, turn skipping for disconnected players, and abandonment of matches with no connected humans.
-- **Responsive presentation** — React game UI, accessible controls, a 1280×640 canvas battlefield, terrain, grid, health bars, predicted paths, animated shots, ballistic history, and a results overlay.
+- **Responsive presentation** — a light 1-bit classic Macintosh interface with pixel display type, pinstriped windows, square controls, patterned units, a 1280×640 canvas battlefield, terrain, grid, health bars, predicted paths, animated shots, ballistic history, and a results overlay.
+
+## Classic Macintosh theme
+
+The client is themed as a white, one-bit desktop: black pixel outlines, pinstriped window title bars, close boxes, square buttons and form fields, a persistent menu bar, and MacPaint-style dithered terrain. Units use four monochrome fill patterns (solid, checker, stripe, and diagonal hatch) instead of colors. Display text is set in Silkscreen, UI copy uses Geneva/Arial, and expressions use Monaco/Consolas.
+
+The theme is a visual layer over the existing client. Structural styles remain in `client/styles.css`; the complete light theme is in `client/classic-mac.css`, with Silkscreen font files in `public/fonts/`. Gameplay rules, trajectory semantics, the server-authoritative model, and the responsive layout are unchanged.
 
 ## Quick start
 
@@ -127,11 +137,15 @@ This is a parabola with zeros at the shooter and target and a 30-unit peak. To a
 client/                   React 19 + Vite browser client
   App.tsx                 session, reconnect, screen routing, Socket.IO actions
   components/             menu, lobby, game screen, math editor, canvas, results
-  styles.css              responsive layout and visual design
+  styles.css              base responsive layout and structural design
+  classic-mac.css         light 1-bit classic Macintosh theme layer
+public/
+  fonts/                  Silkscreen regular/bold and SIL OFL license
+  favicon.svg             1-bit application icon
 shared/                   pure TypeScript used by both sides
   types.ts                wire types, world/game constants
   math/expression.ts      bounded tokenizer, parser, AST evaluator
-  game/world.ts           deterministic terrain, spawns, colors
+  game/world.ts           deterministic terrain, spawns, unit patterns
   game/trajectory.ts      deterministic sampling and collision detection
   game/engine.ts          lobby/turn/shot/victory/rematch state machine
   game/bot.ts             deterministic public-state bot
@@ -204,9 +218,10 @@ Latest verification:
 
 - `npm test` — **44 passed** across 6 files.
 - `npm run typecheck` — passed.
-- `npm run build` — passed (client bundle approximately 314 kB JS / 32 kB CSS before gzip).
+- `npm run build` — passed (client bundle approximately 315 kB JS / 67 kB CSS before gzip).
 - Manual browser test — two independent origins (`http://localhost:3001` and `http://127.0.0.1:3001`, which have separate `localStorage` sessions) joined the same private lobby, synchronized turn state, completed a full match through elimination, displayed the same winner on both clients, and returned both clients to the lobby via rematch.
 - Manual production test — `npm start` served the built client on port 3001; the canvas preview, trajectory prediction, shot animation, health updates, ballistic log, timeout auto-shot, and solo bot turn were exercised.
+- Classic Macintosh manual test — the menu, private lobby, live match, direct-hit preview, victory overlay, rematch, and responsive layouts at 1440 px and 390 px were checked visually; no horizontal overflow was found.
 
 ## Known limitations
 
@@ -224,3 +239,5 @@ Latest verification:
 ## License and attribution
 
 This is an original educational game implementation inspired by the concept of Graphwar. Graphwar and its assets belong to their respective owners; no proprietary assets are included.
+
+The bundled **Silkscreen** font is by The Silkscreen Project Authors and is licensed under the SIL Open Font License 1.1; see `public/fonts/OFL.txt`.

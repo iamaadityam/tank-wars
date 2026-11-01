@@ -51,10 +51,10 @@ export function MathEditor({
   })();
 
   return (
-    <form className="math-editor" onSubmit={submit}>
+    <form className="math-editor" data-window-title="Trajectory" onSubmit={submit}>
       <div className="editor-heading">
         <div>
-          <span className="eyebrow">TRAJECTORY INPUT</span>
+          <span className="eyebrow">FIRE CONTROL</span>
           <h2>Write your shot</h2>
         </div>
         <span className={`editor-state ${preview?.ok ? "valid" : expression ? "invalid" : "idle"}`}>

@@ -54,12 +54,12 @@ export function MenuScreen({
           <span className="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 48 48">
               <path d="M5 38 Q16 5 24 25 T43 12" fill="none" stroke="currentColor" strokeWidth="3" />
-              <circle cx="43" cy="12" r="4" fill="#ff8a3d" />
+              <circle cx="43" cy="12" r="4" fill="currentColor" />
             </svg>
           </span>
           <span>
-            <strong>GRAPH</strong>WAR
-            <em>WEB / FUNCTION ARTILLERY</em>
+            <span className="brand-word"><strong>GRAPH</strong>WAR</span>
+            <em>SYSTEM 1.0 / FUNCTION ARTILLERY</em>
           </span>
         </div>
         <div className="header-right">
@@ -82,7 +82,7 @@ export function MenuScreen({
       </header>
 
       <section className="hero">
-        <div className="hero-copy">
+        <div className="hero-copy" data-window-title="Read Me">
           <span className="eyebrow">PLOT. FIRE. RECALCULATE.</span>
           <h1>
             Artillery,
@@ -108,12 +108,12 @@ export function MenuScreen({
             </div>
           </div>
           <div className="hero-legend">
-            <span><i className="legend-line predicted" /> cyan dashed = preview</span>
-            <span><i className="legend-line fired" /> orange solid = live shot</span>
+            <span><i className="legend-line predicted" /> dashed = preview</span>
+            <span><i className="legend-line fired" /> solid = live shot</span>
           </div>
         </div>
 
-        <div className="play-panel">
+        <div className="play-panel" data-window-title="Graphwar">
           {!profile ? (
             <form className="identity-card" onSubmit={onSubmitName}>
               <span className="eyebrow">CALL SIGN</span>
@@ -159,7 +159,7 @@ export function MenuScreen({
                 onClick={onSolo}
                 type="button"
               >
-                <span className="action-icon">◎</span>
+                <span className="action-icon">1P</span>
                 <span>
                   <strong>Solo practice</strong>
                   <small>Instant match vs. Vector Bot</small>
@@ -173,7 +173,7 @@ export function MenuScreen({
                 onClick={onQuick}
                 type="button"
               >
-                <span className="action-icon">⚡</span>
+                <span className="action-icon">MP</span>
                 <span>
                   <strong>Quick match</strong>
                   <small>Join a public lobby or open one</small>
@@ -268,35 +268,37 @@ export function MenuScreen({
           <span>{guideOpen ? "−" : "+"}</span>
         </button>
         <div className={`guide ${guideOpen ? "open" : ""}`}>
-          <div className="guide-block">
-            <h3>Local trajectory frame</h3>
-            <p>
-              Your unit is the origin. <code>x</code> is horizontal distance travelled in your chosen
-              direction (0 to 132). The curve height is <code>unit.y + f(x)</code>. Choose{" "}
-              <strong>Aim left</strong> or <strong>Aim right</strong> before firing.
-            </p>
-          </div>
-          <div className="guide-block">
-            <h3>Supported syntax</h3>
-            <p>
-              <code>+ − * / ^</code>, parentheses, unary minus, <code>sin cos tan asin acos atan</code>,{" "}
-              <code>sqrt abs exp ln log floor ceil round sign</code>, constants <code>pi e tau</code>.
-              Trigonometry uses radians. Use <code>*</code> for explicit multiplication.
-            </p>
-          </div>
-          <div className="guide-block">
-            <h3>Try a curve</h3>
-            <div className="example-list">
-              {EXAMPLES.map((example) => (
-                <code key={example}>{example}</code>
-              ))}
+          <div className="guide-inner">
+            <div className="guide-block">
+              <h3>Local trajectory frame</h3>
+              <p>
+                Your unit is the origin. <code>x</code> is horizontal distance travelled in your chosen
+                direction (0 to 132). The curve height is <code>unit.y + f(x)</code>. Choose{" "}
+                <strong>Aim left</strong> or <strong>Aim right</strong> before firing.
+              </p>
+            </div>
+            <div className="guide-block">
+              <h3>Supported syntax</h3>
+              <p>
+                <code>+ − * / ^</code>, parentheses, unary minus, <code>sin cos tan asin acos atan</code>,{" "}
+                <code>sqrt abs exp ln log floor ceil round sign</code>, constants <code>pi e tau</code>.
+                Trigonometry uses radians. Use <code>*</code> for explicit multiplication.
+              </p>
+            </div>
+            <div className="guide-block">
+              <h3>Try a curve</h3>
+              <div className="example-list">
+                {EXAMPLES.map((example) => (
+                  <code key={example}>{example}</code>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       <footer className="site-footer">
-        <span>Original browser game · server-authoritative simulation</span>
+        <span>Classic desktop edition · server-authoritative simulation</span>
         <span>No cloud AI · No proprietary Graphwar assets</span>
       </footer>
     </main>

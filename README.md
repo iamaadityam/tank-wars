@@ -49,6 +49,10 @@ npm start
 
 Open <http://localhost:3001>. `npm start` serves the built `dist/` directory when it exists.
 
+### Hosted preview
+
+The Vercel link hosts the built client only. It can render every screen, but sessions, lobbies, shots, and scores need the Node/Socket.IO process. If the server is not running, the client shows **Connection lost — reconnecting**. For full gameplay, use `npm start` locally, or deploy the server separately and set `VITE_SERVER_URL` and `CLIENT_ORIGIN` as described below.
+
 ### Configuration
 
 Copy `.env.example` to `.env` if you need overrides. The server loads `.env` at startup using Node's built-in environment-file loader.
